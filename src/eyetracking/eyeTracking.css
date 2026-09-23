@@ -64,35 +64,57 @@
      INDICADOR DE STATUS
      ============================================================ */
   
-  .eye-tracking-status-dot {
-    position: absolute;
-  
-    right: 3px;
-    bottom: 4px;
-  
-    width: 11px;
-    height: 11px;
-  
-    border-radius: 50%;
-  
-    border: 2px solid #ffffff;
-  }
-  
-  .eye-tracking-status-off {
-    background: #9e9e9e;
-  }
-  
-  .eye-tracking-status-initializing {
-    background: #1976d2;
-  }
-  
-  .eye-tracking-status-tracking {
-    background: #2e7d32;
-  }
-  
-  .eye-tracking-status-error {
-    background: #c62828;
-  }
+  /* ============================================================
+   INDICADOR DE STATUS
+   ============================================================ */
+
+.eye-tracking-status-dot {
+  position: absolute;
+
+  right: 2px;
+  bottom: 2px;
+
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+
+  border: 2px solid #ffffff;
+
+  box-sizing: border-box;
+
+  z-index: 2;
+}
+
+/* desligado */
+.eye-tracking-status-dot.off,
+.eye-tracking-status-off {
+  background-color: #9e9e9e;
+}
+
+/* inicializando */
+.eye-tracking-status-dot.initializing,
+.eye-tracking-status-initializing {
+  background-color: #1976d2;
+}
+
+/* monitorando */
+.eye-tracking-status-dot.tracking,
+.eye-tracking-status-tracking {
+  background-color: #2e7d32;
+}
+
+/* erro */
+.eye-tracking-status-dot.error,
+.eye-tracking-status-error {
+  background-color: #c62828;
+}
+
+/* perda do rastreamento */
+.eye-tracking-status-dot.lost,
+.eye-tracking-status-lost {
+  background-color: #c62828;
+}
   
   /* ============================================================
      OVERLAY DE CALIBRAÇÃO
@@ -232,6 +254,8 @@
     color: #1b5e20;
   
     cursor: pointer;
+    
+    z-index: 10060;
   
     animation:
       calibrationPointPulse
