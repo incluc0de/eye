@@ -45,19 +45,12 @@ import {
       let cancelled = false;
       let retryTimer = null;
       let cameraReleased = false;
+      let calibrationContainer = null;
   
       /*
        * --------------------------------------------------------
        * NORMALIZA O ELEMENTO DE VÍDEO
        * --------------------------------------------------------
-       *
-       * Depois de uma sessão anterior,
-       * showVideoPreview(false) pode ter
-       * deixado propriedades visuais no
-       * próprio elemento <video>.
-       *
-       * Portanto não basta mostrar apenas
-       * o container.
        */
   
       const normalizeVideoElement =
@@ -69,7 +62,7 @@ import {
           let video = null;
   
           /*
-           * Primeiro tenta localizar pelo ID
+           * Tenta localizar pelo ID
            * fornecido pelo WebGazer.
            */
   
@@ -82,9 +75,7 @@ import {
   
           /*
            * Fallback:
-           *
-           * se por algum motivo o ID não estiver
-           * disponível, procuramos o vídeo dentro
+           * procura o vídeo dentro
            * do container.
            */
   
@@ -115,9 +106,7 @@ import {
           }
   
           /*
-           * ====================================================
-           * RESTAURA EXIBIÇÃO DO VÍDEO
-           * ====================================================
+           * Restaura a exibição do vídeo.
            */
   
           video.style.display =
@@ -129,27 +118,18 @@ import {
           video.style.opacity =
             "1";
   
-          /*
-           * O elemento deve continuar ocupando
-           * normalmente sua área no container.
-           */
-  
           video.hidden = false;
-  
-          console.log(
-            "[Calibration] Elemento de vídeo normalizado."
-          );
   
           return true;
         };
   
       /*
        * --------------------------------------------------------
-       * POSICIONAR CÂMERA
+       * PREPARA O CONTAINER
        * --------------------------------------------------------
        */
   
-      const positionCamera = () => {
+      const prepareCamera = () => {
         if (cancelled) {
           return;
         }
@@ -165,7 +145,7 @@ import {
   
           retryTimer =
             window.setTimeout(
-              positionCamera,
+              prepareCamera,
               50
             );
   
@@ -184,38 +164,37 @@ import {
   
           retryTimer =
             window.setTimeout(
-              positionCamera,
+              prepareCamera,
               50
             );
   
           return;
         }
   
+        calibrationContainer =
+          container;
+  
         /*
          * ======================================================
-         * 1. CENTRALIZA O CONTAINER
+         * RESPONSIVIDADE
          * ======================================================
+         *
+         * Não posicionamos mais a câmera
+         * diretamente via:
+         *
+         * container.style.top = ...
+         *
+         * A posição e o tamanho passam
+         * a ser controlados pelo CSS.
          */
   
-        container.style.position =
-          "fixed";
-  
-        container.style.left =
-          "50%";
-  
-        container.style.top =
-          "37%";
-  
-        container.style.transform =
-          "translate(-50%, -50%)";
-  
-        container.style.zIndex =
-          "10020";
+        container.classList.add(
+          "incluc0de-calibration-camera"
+        );
   
         /*
-         * ======================================================
-         * 2. NORMALIZA O CONTAINER
-         * ======================================================
+         * Normaliza propriedades que podem
+         * ter permanecido de uma sessão anterior.
          */
   
         container.style.display =
@@ -225,14 +204,8 @@ import {
           "1";
   
         /*
-         * A visibility ainda está sendo
-         * protegida pelo Provider através
-         * da regra CSS com !important.
-         */
-  
-        /*
          * ======================================================
-         * 3. MANDA WEBGAZER MOSTRAR O PREVIEW
+         * GARANTE OS VISUAIS DO WEBGAZER
          * ======================================================
          */
   
@@ -244,42 +217,26 @@ import {
             .showFaceFeedbackBox(true);
         } catch (err) {
           console.warn(
-            "[Calibration] Erro ao configurar visuais:",
+            "[Calibration] Erro ao configurar elementos visuais:",
             err
           );
         }
   
         /*
-         * ======================================================
-         * 4. NORMALIZA O <VIDEO>
-         * ======================================================
-         *
-         * Esta é a principal correção
-         * desta versão.
+         * Normaliza o próprio <video>.
          */
   
         normalizeVideoElement();
   
         /*
-         * ======================================================
-         * 5. REFORÇA O CONTAINER
-         * ======================================================
+         * showVideoPreview() pode modificar
+         * estilos. Garantimos novamente
+         * nossa classe responsiva.
          */
   
-        container.style.position =
-          "fixed";
-  
-        container.style.left =
-          "50%";
-  
-        container.style.top =
-          "37%";
-  
-        container.style.transform =
-          "translate(-50%, -50%)";
-  
-        container.style.zIndex =
-          "10020";
+        container.classList.add(
+          "incluc0de-calibration-camera"
+        );
   
         container.style.display =
           "block";
@@ -289,7 +246,7 @@ import {
   
         /*
          * ======================================================
-         * 6. AGUARDA DOIS FRAMES
+         * LIBERA A EXIBIÇÃO
          * ======================================================
          */
   
@@ -298,12 +255,6 @@ import {
             if (cancelled) {
               return;
             }
-  
-            /*
-             * Normalizamos novamente porque
-             * o WebGazer pode alterar o vídeo
-             * de forma assíncrona.
-             */
   
             normalizeVideoElement();
   
@@ -317,27 +268,17 @@ import {
                   return;
                 }
   
-                /*
-                 * Última normalização antes
-                 * da exibição.
-                 */
-  
                 normalizeVideoElement();
-  
-                /*
-                 * ==================================================
-                 * 7. REMOVE A PROTEÇÃO DE INICIALIZAÇÃO
-                 * ==================================================
-                 */
   
                 cameraReleased = true;
   
-                onCameraReady?.();
-  
                 /*
-                 * Agora o container pode
-                 * efetivamente aparecer.
+                 * O Provider remove a proteção
+                 * que escondia o container
+                 * durante begin().
                  */
+  
+                onCameraReady?.();
   
                 container.style.visibility =
                   "visible";
@@ -348,15 +289,10 @@ import {
                 container.style.opacity =
                   "1";
   
-                /*
-                 * E garantimos mais uma vez
-                 * que o vídeo está visível.
-                 */
-  
                 normalizeVideoElement();
   
                 console.log(
-                  "[Calibration] Câmera centralizada e preview restaurado."
+                  "[Calibration] Câmera preparada e exibida."
                 );
               }
             );
@@ -364,23 +300,12 @@ import {
         );
       };
   
-      /*
-       * Inicia.
-       */
-  
-      positionCamera();
+      prepareCamera();
   
       /*
        * ========================================================
        * CLEANUP
        * ========================================================
-       *
-       * Não restauramos estilos.
-       *
-       * Provider controla o ciclo de vida:
-       *
-       * conclusão → esconde visuais
-       * cancelamento → encerra WebGazer
        */
   
       return () => {
@@ -390,6 +315,22 @@ import {
           window.clearTimeout(
             retryTimer
           );
+        }
+  
+        /*
+         * Removemos apenas nossa classe
+         * responsiva.
+         *
+         * Não restauramos visibility/display/
+         * opacity, pois o Provider controla
+         * o ciclo de vida do WebGazer.
+         */
+  
+        if (calibrationContainer) {
+          calibrationContainer
+            .classList.remove(
+              "incluc0de-calibration-camera"
+            );
         }
   
         console.log(
@@ -413,9 +354,7 @@ import {
       );
   
       setCurrentPointIndex(0);
-  
       setClickCount(0);
-  
       setPhase("calibration");
     }
   
@@ -464,10 +403,6 @@ import {
   
         return;
       }
-  
-      /*
-       * Verifica se é o último ponto.
-       */
   
       const isLastPoint =
         currentPointIndex ===
@@ -518,7 +453,7 @@ import {
   
     /*
      * ==========================================================
-     * ESTADO VISUAL
+     * ESTADO VISUAL DOS PONTOS
      * ==========================================================
      */
   
@@ -556,7 +491,7 @@ import {
   
     /*
      * ==========================================================
-     * CONTEÚDO DOS PONTOS
+     * CONTEÚDO DO PONTO
      * ==========================================================
      */
   
@@ -632,7 +567,6 @@ import {
                 style={{
                   left:
                     `${point.x}%`,
-  
                   top:
                     `${point.y}%`,
                 }}
@@ -653,14 +587,10 @@ import {
                 aria-label={
                   pointState ===
                   "active"
-  
                     ? `Ponto de calibração ${point.id}, ${point.label}. Clique ${clickCount + 1} de ${CALIBRATION_CLICKS_PER_POINT}.`
-  
                     : pointState ===
                         "completed"
-  
                       ? `Ponto de calibração ${point.id} concluído.`
-  
                       : `Ponto de calibração ${point.id}, ${point.label}.`
                 }
               >
@@ -680,6 +610,12 @@ import {
           className="calibration-instructions"
           aria-live="polite"
         >
+          {/*
+           * ----------------------------------------------------
+           * ORIENTAÇÃO
+           * ----------------------------------------------------
+           */}
+  
           {phase ===
             "orientation" && (
             <>
@@ -734,6 +670,12 @@ import {
             </>
           )}
   
+          {/*
+           * ----------------------------------------------------
+           * CALIBRAÇÃO
+           * ----------------------------------------------------
+           */}
+  
           {phase ===
             "calibration" && (
             <>
@@ -760,6 +702,12 @@ import {
               </button>
             </>
           )}
+  
+          {/*
+           * ----------------------------------------------------
+           * CONCLUSÃO
+           * ----------------------------------------------------
+           */}
   
           {phase ===
             "completed" && (
