@@ -6,27 +6,53 @@
 </head>
 
 <body>
+
   <h1>Teste MediaPipe FaceMesh</h1>
-  <pre id="status">Carregando...</pre>
+
+  <video
+    id="video"
+    width="640"
+    height="480"
+    autoplay
+    playsinline>
+  </video>
+
+  <pre id="status">Inicializando...</pre>
 
   <script src="/mediapipe/face_mesh/face_mesh.js"></script>
 
   <script>
     const status = document.getElementById("status");
+    const video = document.getElementById("video");
 
     async function testar() {
+
       try {
+
+        // --------------------------------------------------
+        // 1. Criar FaceMesh
+        // --------------------------------------------------
+
         status.textContent = "Criando FaceMesh...";
 
         const faceMesh = new FaceMesh({
           locateFile: (file) => {
+
             const url = `/mediapipe/face_mesh/${file}`;
-            console.log("MediaPipe solicitou:", url);
+
+            console.log(
+              "MediaPipe solicitou:",
+              url
+            );
+
             return url;
           }
         });
 
-        status.textContent = "Configurando FaceMesh...";
+
+        // --------------------------------------------------
+        // 2. Configurar
+        // --------------------------------------------------
 
         faceMesh.setOptions({
           maxNumFaces: 1,
@@ -35,27 +61,84 @@
           minTrackingConfidence: 0.5
         });
 
+
+        // --------------------------------------------------
+        // 3. Receber resultados
+        // --------------------------------------------------
+
         faceMesh.onResults((results) => {
-          console.log("RESULTADO:", results);
+
+          console.log(
+            "RESULTADO FACEMESH:",
+            results
+          );
+
+          const faces =
+            results.multiFaceLandmarks?.length || 0;
+
+          status.textContent =
+            "FaceMesh funcionando!\n\n" +
+            "Faces detectadas: " +
+            faces;
         });
 
-        status.textContent =
-          "FaceMesh criado sem erro.\n\n" +
-          "Objeto:\n" +
-          Object.keys(faceMesh).join("\n");
 
-        console.log("FaceMesh criado:", faceMesh);
-
-      } catch (erro) {
-        console.error("ERRO FACEMESH:", erro);
+        // --------------------------------------------------
+        // 4. Solicitar webcam
+        // --------------------------------------------------
 
         status.textContent =
-          "ERRO:\n\n" +
+          "Solicitando acesso à câmera...";
+
+        const stream =
+          await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
+
+        video.srcObject = stream;
+
+        await video.play();
+
+
+        status.textContent =
+          "Câmera ativa.\n" +
+          "Enviando frame para FaceMesh...";
+
+
+        // --------------------------------------------------
+        // 5. Enviar frame
+        //
+        // ESTE É O TESTE IMPORTANTE
+        // --------------------------------------------------
+
+        await faceMesh.send({
+          image: video
+        });
+
+
+        console.log(
+          "faceMesh.send() concluído."
+        );
+
+      }
+
+      catch (erro) {
+
+        console.error(
+          "ERRO FACEMESH:",
+          erro
+        );
+
+        status.textContent =
+          "ERRO FACEMESH:\n\n" +
           (erro?.stack || erro);
       }
     }
 
+
     testar();
+
   </script>
+
 </body>
 </html>
