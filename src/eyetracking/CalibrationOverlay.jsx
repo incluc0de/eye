@@ -37,20 +37,115 @@ import {
   
     /*
      * ==========================================================
-     * POSICIONAMENTO DA CÂMERA
+     * CÂMERA / PREVIEW
      * ==========================================================
      */
   
     useEffect(() => {
       let cancelled = false;
-  
       let retryTimer = null;
-  
-      let positionedContainer = null;
+      let cameraReleased = false;
   
       /*
        * --------------------------------------------------------
-       * POSICIONAR
+       * NORMALIZA O ELEMENTO DE VÍDEO
+       * --------------------------------------------------------
+       *
+       * Depois de uma sessão anterior,
+       * showVideoPreview(false) pode ter
+       * deixado propriedades visuais no
+       * próprio elemento <video>.
+       *
+       * Portanto não basta mostrar apenas
+       * o container.
+       */
+  
+      const normalizeVideoElement =
+        () => {
+          const videoId =
+            webgazer?.params
+              ?.videoElementId;
+  
+          let video = null;
+  
+          /*
+           * Primeiro tenta localizar pelo ID
+           * fornecido pelo WebGazer.
+           */
+  
+          if (videoId) {
+            video =
+              document.getElementById(
+                videoId
+              );
+          }
+  
+          /*
+           * Fallback:
+           *
+           * se por algum motivo o ID não estiver
+           * disponível, procuramos o vídeo dentro
+           * do container.
+           */
+  
+          if (!video) {
+            const containerId =
+              webgazer?.params
+                ?.videoContainerId;
+  
+            const container =
+              containerId
+                ? document.getElementById(
+                    containerId
+                  )
+                : null;
+  
+            video =
+              container?.querySelector(
+                "video"
+              ) || null;
+          }
+  
+          if (!video) {
+            console.warn(
+              "[Calibration] Elemento <video> ainda não encontrado."
+            );
+  
+            return false;
+          }
+  
+          /*
+           * ====================================================
+           * RESTAURA EXIBIÇÃO DO VÍDEO
+           * ====================================================
+           */
+  
+          video.style.display =
+            "block";
+  
+          video.style.visibility =
+            "visible";
+  
+          video.style.opacity =
+            "1";
+  
+          /*
+           * O elemento deve continuar ocupando
+           * normalmente sua área no container.
+           */
+  
+          video.hidden = false;
+  
+          console.log(
+            "[Calibration] Elemento de vídeo normalizado."
+          );
+  
+          return true;
+        };
+  
+      /*
+       * --------------------------------------------------------
+       * POSICIONAR CÂMERA
        * --------------------------------------------------------
        */
   
@@ -64,6 +159,10 @@ import {
             ?.videoContainerId;
   
         if (!containerId) {
+          console.log(
+            "[Calibration] Aguardando videoContainerId..."
+          );
+  
           retryTimer =
             window.setTimeout(
               positionCamera,
@@ -79,6 +178,10 @@ import {
           );
   
         if (!container) {
+          console.log(
+            "[Calibration] Aguardando container de vídeo..."
+          );
+  
           retryTimer =
             window.setTimeout(
               positionCamera,
@@ -88,33 +191,9 @@ import {
           return;
         }
   
-        positionedContainer =
-          container;
-  
         /*
          * ======================================================
-         * GUARDA ESTILOS ORIGINAIS
-         * ======================================================
-         */
-  
-        container.dataset.originalPosition =
-          container.style.position || "";
-  
-        container.dataset.originalLeft =
-          container.style.left || "";
-  
-        container.dataset.originalTop =
-          container.style.top || "";
-  
-        container.dataset.originalTransform =
-          container.style.transform || "";
-  
-        container.dataset.originalZIndex =
-          container.style.zIndex || "";
-  
-        /*
-         * ======================================================
-         * CENTRALIZA
+         * 1. CENTRALIZA O CONTAINER
          * ======================================================
          */
   
@@ -135,19 +214,56 @@ import {
   
         /*
          * ======================================================
-         * GARANTE ELEMENTOS VISUAIS
+         * 2. NORMALIZA O CONTAINER
          * ======================================================
          */
   
-        webgazer
-          .showVideoPreview(true)
-          .showPredictionPoints(false)
-          .showFaceOverlay(true)
-          .showFaceFeedbackBox(true);
+        container.style.display =
+          "block";
+  
+        container.style.opacity =
+          "1";
   
         /*
-         * Algumas funções do WebGazer podem
-         * alterar estilos. Portanto reforçamos.
+         * A visibility ainda está sendo
+         * protegida pelo Provider através
+         * da regra CSS com !important.
+         */
+  
+        /*
+         * ======================================================
+         * 3. MANDA WEBGAZER MOSTRAR O PREVIEW
+         * ======================================================
+         */
+  
+        try {
+          webgazer
+            .showVideoPreview(true)
+            .showPredictionPoints(false)
+            .showFaceOverlay(true)
+            .showFaceFeedbackBox(true);
+        } catch (err) {
+          console.warn(
+            "[Calibration] Erro ao configurar visuais:",
+            err
+          );
+        }
+  
+        /*
+         * ======================================================
+         * 4. NORMALIZA O <VIDEO>
+         * ======================================================
+         *
+         * Esta é a principal correção
+         * desta versão.
+         */
+  
+        normalizeVideoElement();
+  
+        /*
+         * ======================================================
+         * 5. REFORÇA O CONTAINER
+         * ======================================================
          */
   
         container.style.position =
@@ -165,20 +281,16 @@ import {
         container.style.zIndex =
           "10020";
   
+        container.style.display =
+          "block";
+  
+        container.style.opacity =
+          "1";
+  
         /*
          * ======================================================
-         * AGUARDA O PRÓXIMO FRAME
+         * 6. AGUARDA DOIS FRAMES
          * ======================================================
-         *
-         * Nesse momento:
-         *
-         * - container existe;
-         * - câmera existe;
-         * - posição está correta;
-         * - overlay já está renderizado.
-         *
-         * Agora podemos remover a proteção
-         * que o mantinha invisível.
          */
   
         requestAnimationFrame(
@@ -187,16 +299,64 @@ import {
               return;
             }
   
+            /*
+             * Normalizamos novamente porque
+             * o WebGazer pode alterar o vídeo
+             * de forma assíncrona.
+             */
+  
+            normalizeVideoElement();
+  
             requestAnimationFrame(
               () => {
                 if (cancelled) {
                   return;
                 }
   
+                if (cameraReleased) {
+                  return;
+                }
+  
+                /*
+                 * Última normalização antes
+                 * da exibição.
+                 */
+  
+                normalizeVideoElement();
+  
+                /*
+                 * ==================================================
+                 * 7. REMOVE A PROTEÇÃO DE INICIALIZAÇÃO
+                 * ==================================================
+                 */
+  
+                cameraReleased = true;
+  
                 onCameraReady?.();
   
+                /*
+                 * Agora o container pode
+                 * efetivamente aparecer.
+                 */
+  
+                container.style.visibility =
+                  "visible";
+  
+                container.style.display =
+                  "block";
+  
+                container.style.opacity =
+                  "1";
+  
+                /*
+                 * E garantimos mais uma vez
+                 * que o vídeo está visível.
+                 */
+  
+                normalizeVideoElement();
+  
                 console.log(
-                  "[Calibration] Câmera posicionada. Exibição liberada."
+                  "[Calibration] Câmera centralizada e preview restaurado."
                 );
               }
             );
@@ -204,12 +364,23 @@ import {
         );
       };
   
+      /*
+       * Inicia.
+       */
+  
       positionCamera();
   
       /*
        * ========================================================
        * CLEANUP
        * ========================================================
+       *
+       * Não restauramos estilos.
+       *
+       * Provider controla o ciclo de vida:
+       *
+       * conclusão → esconde visuais
+       * cancelamento → encerra WebGazer
        */
   
       return () => {
@@ -221,44 +392,9 @@ import {
           );
         }
   
-        if (!positionedContainer) {
-          return;
-        }
-  
-        positionedContainer.style.position =
-          positionedContainer.dataset
-            .originalPosition || "";
-  
-        positionedContainer.style.left =
-          positionedContainer.dataset
-            .originalLeft || "";
-  
-        positionedContainer.style.top =
-          positionedContainer.dataset
-            .originalTop || "";
-  
-        positionedContainer.style.transform =
-          positionedContainer.dataset
-            .originalTransform || "";
-  
-        positionedContainer.style.zIndex =
-          positionedContainer.dataset
-            .originalZIndex || "";
-  
-        delete positionedContainer.dataset
-          .originalPosition;
-  
-        delete positionedContainer.dataset
-          .originalLeft;
-  
-        delete positionedContainer.dataset
-          .originalTop;
-  
-        delete positionedContainer.dataset
-          .originalTransform;
-  
-        delete positionedContainer.dataset
-          .originalZIndex;
+        console.log(
+          "[Calibration] Overlay desmontado."
+        );
       };
     }, [
       webgazer,
@@ -267,7 +403,7 @@ import {
   
     /*
      * ==========================================================
-     * COMEÇAR
+     * INICIAR CALIBRAÇÃO
      * ==========================================================
      */
   
@@ -330,7 +466,7 @@ import {
       }
   
       /*
-       * Ponto concluído.
+       * Verifica se é o último ponto.
        */
   
       const isLastPoint =
@@ -338,9 +474,9 @@ import {
         calibrationPoints.length - 1;
   
       /*
-       * --------------------------------------------------------
+       * ========================================================
        * ÚLTIMO PONTO
-       * --------------------------------------------------------
+       * ========================================================
        */
   
       if (isLastPoint) {
@@ -352,7 +488,9 @@ import {
           CALIBRATION_CLICKS_PER_POINT
         );
   
-        setPhase("completed");
+        setPhase(
+          "completed"
+        );
   
         window.setTimeout(
           () => {
@@ -365,9 +503,9 @@ import {
       }
   
       /*
-       * --------------------------------------------------------
-       * PRÓXIMO
-       * --------------------------------------------------------
+       * ========================================================
+       * PRÓXIMO PONTO
+       * ========================================================
        */
   
       setCurrentPointIndex(
@@ -380,11 +518,13 @@ import {
   
     /*
      * ==========================================================
-     * ESTADO DO PONTO
+     * ESTADO VISUAL
      * ==========================================================
      */
   
-    function getPointState(index) {
+    function getPointState(
+      index
+    ) {
       if (
         phase === "orientation"
       ) {
@@ -416,7 +556,7 @@ import {
   
     /*
      * ==========================================================
-     * CONTEÚDO DO PONTO
+     * CONTEÚDO DOS PONTOS
      * ==========================================================
      */
   
@@ -463,14 +603,16 @@ import {
       >
         {/*
          * ======================================================
-         * PONTOS
+         * OITO PONTOS
          * ======================================================
          */}
   
         {calibrationPoints.map(
           (point, index) => {
             const pointState =
-              getPointState(index);
+              getPointState(
+                index
+              );
   
             const content =
               getPointContent(
@@ -511,10 +653,14 @@ import {
                 aria-label={
                   pointState ===
                   "active"
+  
                     ? `Ponto de calibração ${point.id}, ${point.label}. Clique ${clickCount + 1} de ${CALIBRATION_CLICKS_PER_POINT}.`
+  
                     : pointState ===
                         "completed"
+  
                       ? `Ponto de calibração ${point.id} concluído.`
+  
                       : `Ponto de calibração ${point.id}, ${point.label}.`
                 }
               >
@@ -526,7 +672,7 @@ import {
   
         {/*
          * ======================================================
-         * INSTRUÇÕES
+         * PAINEL CENTRAL
          * ======================================================
          */}
   
