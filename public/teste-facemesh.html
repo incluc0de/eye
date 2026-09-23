@@ -36,18 +36,12 @@
         status.textContent = "Criando FaceMesh...";
 
         const faceMesh = new FaceMesh({
-          locateFile: (file) => {
-
-            const url = `/mediapipe/face_mesh/${file}`;
-
-            console.log(
-              "MediaPipe solicitou:",
-              url
-            );
-
-            return url;
-          }
-        });
+  locateFile: (file) => {
+    const url = `/mediapipe/face_mesh_npm/${file}`;
+    console.log("MediaPipe solicitou:", url);
+    return url;
+  }
+});
 
 
         // --------------------------------------------------
