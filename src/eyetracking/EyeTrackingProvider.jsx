@@ -36,6 +36,9 @@ export const EyeTrackingState = {
 
 export function EyeTrackingProvider({
   children,
+  userId,
+  applicationName,
+  sessionId,
 }) {
   const [state, setState] =
     useState(EyeTrackingState.OFF);
@@ -62,44 +65,437 @@ export function EyeTrackingProvider({
 
   /*
    * ==========================================================
+   * BUFFER DE EVENTOS OBSERVÁVEIS
+   * ==========================================================
+   */
+
+  const [events, setEvents] =
+    useState([]);
+
+  const [gazeState, setGazeState] =
+    useState("UNKNOWN");
+
+  const monitoringRef =
+    useRef(false);
+
+  const gazeStateRef =
+    useRef("UNKNOWN");
+
+  const lastPredictionAtRef =
+    useRef(null);
+
+  const browserActiveRef =
+    useRef(true);
+
+  const MAX_EVENTS = 50;
+
+  const GAZE_LOST_AFTER_MS =
+    1500;
+
+  /*
+   * ==========================================================
+   * GERAR ID DO EVENTO
+   * ==========================================================
+   */
+
+  function createEventId() {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID ===
+        "function"
+    ) {
+      return (
+        `evt_${crypto.randomUUID()}`
+      );
+    }
+
+    return (
+      `evt_${Date.now()}_${Math.random()
+        .toString(16)
+        .slice(2)}`
+    );
+  }
+
+  /*
+   * ==========================================================
+   * ADICIONAR EVENTO AO BUFFER
+   * ==========================================================
+   *
+   * Esta função centraliza a criação dos eventos.
+   *
+   * Posteriormente, este é um dos pontos naturais
+   * para integrar o POST para o serviço remoto.
+   * ==========================================================
+   */
+
+  function appendEvent(
+    type,
+    source,
+    extra = {}
+  ) {
+    /*
+     * Não registramos eventos antes da
+     * conclusão da calibração.
+     */
+
+    if (!monitoringRef.current) {
+      return;
+    }
+
+    const event = {
+      id:
+        createEventId(),
+
+      schemaVersion:
+        "1.0",
+
+      timestamp:
+        new Date().toISOString(),
+
+      sessionId,
+
+      userId,
+
+      application: {
+        name:
+          applicationName,
+      },
+
+      provider: {
+        name:
+          "EyeTrackingContext",
+
+        version:
+          "1.0",
+      },
+
+      event: {
+        type,
+        source,
+      },
+
+      browser: {
+        visibilityState:
+          document.visibilityState,
+
+        hasFocus:
+          document.hasFocus(),
+      },
+
+      ...extra,
+    };
+
+    /*
+     * Mantemos apenas os 50
+     * eventos mais recentes.
+     */
+
+    setEvents(
+      (current) =>
+        [
+          event,
+          ...current,
+        ].slice(
+          0,
+          MAX_EVENTS
+        )
+    );
+
+    console.log(
+      "[EyeTracking] EVENT",
+      event
+    );
+  }
+
+  /*
+   * ==========================================================
+   * ATUALIZAR ESTADO DO OLHAR
+   * ==========================================================
+   *
+   * Apenas mudanças de estado geram eventos.
+   *
+   * INSIDE -> INSIDE
+   * nenhum evento
+   *
+   * INSIDE -> OUTSIDE
+   * GAZE_OUTSIDE_CONTENT
+   *
+   * OUTSIDE -> INSIDE
+   * GAZE_ON_CONTENT
+   *
+   * qualquer -> LOST
+   * GAZE_LOST
+   *
+   * LOST -> INSIDE/OUTSIDE
+   * GAZE_RECOVERED
+   * ==========================================================
+   */
+
+  function updateGazeState(
+    nextState,
+    gazeData = null
+  ) {
+    const previousState =
+      gazeStateRef.current;
+
+    /*
+     * Estado não mudou.
+     *
+     * Não geramos novo evento.
+     */
+
+    if (
+      previousState ===
+      nextState
+    ) {
+      return;
+    }
+
+    gazeStateRef.current =
+      nextState;
+
+    setGazeState(
+      nextState
+    );
+
+    /*
+     * Informações do gaze associadas
+     * ao evento.
+     */
+
+    const gazePayload =
+      gazeData
+        ? {
+            gaze: {
+              state:
+                nextState,
+
+              x:
+                gazeData.x,
+
+              y:
+                gazeData.y,
+
+              viewport: {
+                width:
+                  window.innerWidth,
+
+                height:
+                  window.innerHeight,
+              },
+            },
+          }
+        : {
+            gaze: {
+              state:
+                nextState,
+
+              x:
+                null,
+
+              y:
+                null,
+
+              viewport: {
+                width:
+                  window.innerWidth,
+
+                height:
+                  window.innerHeight,
+              },
+            },
+          };
+
+    /*
+     * --------------------------------------------------------
+     * GAZE LOST
+     * --------------------------------------------------------
+     */
+
+    if (
+      nextState ===
+      "LOST"
+    ) {
+      appendEvent(
+        "GAZE_LOST",
+        "gaze",
+        gazePayload
+      );
+
+      return;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * RECUPERAÇÃO DO GAZE
+     * --------------------------------------------------------
+     */
+
+    if (
+      previousState ===
+      "LOST"
+    ) {
+      appendEvent(
+        "GAZE_RECOVERED",
+        "gaze",
+        gazePayload
+      );
+
+      return;
+    }
+
+    /*
+     * --------------------------------------------------------
+     * INSIDE / OUTSIDE
+     * --------------------------------------------------------
+     */
+
+    appendEvent(
+      nextState ===
+        "INSIDE"
+        ? "GAZE_ON_CONTENT"
+        : "GAZE_OUTSIDE_CONTENT",
+
+      "gaze",
+
+      gazePayload
+    );
+  }
+
+  /*
+   * ==========================================================
    * LISTENER DO GAZE
    * ==========================================================
    */
 
   function configureGazeListener() {
     webgazer.setGazeListener(
-      (data, elapsedTime) => {
+      (
+        data,
+        elapsedTime
+      ) => {
+        /*
+         * WebGazer não produziu
+         * uma coordenada válida.
+         */
+
         if (!data) {
           return;
         }
 
-        if (!mountedRef.current) {
+        /*
+         * Provider desmontado.
+         */
+
+        if (
+          !mountedRef.current
+        ) {
           return;
         }
 
-        if (!startedRef.current) {
+        /*
+         * WebGazer não está ativo.
+         */
+
+        if (
+          !startedRef.current
+        ) {
           return;
         }
+
+        /*
+         * ----------------------------------------------------
+         * COORDENADAS
+         * ----------------------------------------------------
+         */
 
         const gazeX =
-          Math.round(data.x);
+          Math.round(
+            data.x
+          );
 
         const gazeY =
-          Math.round(data.y);
+          Math.round(
+            data.y
+          );
+
+        const predictionAt =
+          Date.now();
+
+        /*
+         * Guarda o horário da
+         * última predição válida.
+         */
+
+        lastPredictionAtRef.current =
+          predictionAt;
+
+        /*
+         * Mantém o gaze disponível
+         * para os componentes.
+         */
 
         setGaze({
-          x: gazeX,
-          y: gazeY,
+          x:
+            gazeX,
+
+          y:
+            gazeY,
+
           elapsedTime,
+
           lastPredictionAt:
-            Date.now(),
+            predictionAt,
         });
+
+        /*
+         * ----------------------------------------------------
+         * CLASSIFICAÇÃO INSIDE / OUTSIDE
+         * ----------------------------------------------------
+         *
+         * Só fazemos essa classificação quando:
+         *
+         * - calibração terminou;
+         * - monitoramento está ativo;
+         * - aplicação está visível;
+         * - janela possui foco.
+         */
+
+        if (
+          monitoringRef.current &&
+          browserActiveRef.current
+        ) {
+          const inside =
+            gazeX >= 0 &&
+            gazeY >= 0 &&
+            gazeX <=
+              window.innerWidth &&
+            gazeY <=
+              window.innerHeight;
+
+          updateGazeState(
+            inside
+              ? "INSIDE"
+              : "OUTSIDE",
+            {
+              x:
+                gazeX,
+
+              y:
+                gazeY,
+            }
+          );
+        }
 
         console.log(
           "[EyeTracking] GAZE",
           {
-            x: gazeX,
-            y: gazeY,
+            x:
+              gazeX,
+
+            y:
+              gazeY,
+
             elapsedTime,
           }
         );
@@ -132,7 +528,9 @@ export function EyeTrackingProvider({
     }
 
     const style =
-      document.createElement("style");
+      document.createElement(
+        "style"
+      );
 
     style.id =
       "incluc0de-webgazer-startup-hide";
@@ -199,10 +597,18 @@ export function EyeTrackingProvider({
   function hideTrackingVisuals() {
     try {
       webgazer
-        .showVideoPreview(false)
-        .showPredictionPoints(false)
-        .showFaceOverlay(false)
-        .showFaceFeedbackBox(false);
+        .showVideoPreview(
+          false
+        )
+        .showPredictionPoints(
+          false
+        )
+        .showFaceOverlay(
+          false
+        )
+        .showFaceFeedbackBox(
+          false
+        );
     } catch (err) {
       console.warn(
         "[EyeTracking] Não foi possível esconder algum elemento visual:",
@@ -219,10 +625,17 @@ export function EyeTrackingProvider({
 
   function resetGaze() {
     setGaze({
-      x: null,
-      y: null,
-      elapsedTime: null,
-      lastPredictionAt: null,
+      x:
+        null,
+
+      y:
+        null,
+
+      elapsedTime:
+        null,
+
+      lastPredictionAt:
+        null,
     });
   }
 
@@ -265,9 +678,6 @@ export function EyeTrackingProvider({
      * --------------------------------------------------------
      * 2. Garantia adicional usando stopVideo()
      * --------------------------------------------------------
-     *
-     * Nossa versão do WebGazer disponibiliza
-     * esse método para interromper o stream.
      */
 
     try {
@@ -332,10 +742,12 @@ export function EyeTrackingProvider({
             );
 
           /*
-           * Desassocia o stream do elemento.
+           * Desassocia o stream
+           * do elemento.
            */
 
-          video.srcObject = null;
+          video.srcObject =
+            null;
 
           console.log(
             "[EyeTracking] MediaStreamTracks encerradas."
@@ -350,7 +762,8 @@ export function EyeTrackingProvider({
     }
 
     /*
-     * Por segurança, remove a regra temporária.
+     * Por segurança, remove
+     * a regra temporária.
      */
 
     removeStartupHideStyle();
@@ -367,11 +780,15 @@ export function EyeTrackingProvider({
    */
 
   async function enable() {
-    if (startedRef.current) {
+    if (
+      startedRef.current
+    ) {
       return;
     }
 
-    if (initializingRef.current) {
+    if (
+      initializingRef.current
+    ) {
       return;
     }
 
@@ -379,7 +796,9 @@ export function EyeTrackingProvider({
       initializingRef.current =
         true;
 
-      setError(null);
+      setError(
+        null
+      );
 
       setState(
         EyeTrackingState.INITIALIZING
@@ -409,19 +828,21 @@ export function EyeTrackingProvider({
        * ======================================================
        * 3. CONFIGURA VISUAIS
        * ======================================================
-       *
-       * O WebGazer precisa poder criar o preview.
-       *
-       * Ele será criado normalmente, porém estará
-       * invisível por causa da regra CSS instalada
-       * anteriormente.
        */
 
       webgazer
-        .showVideoPreview(true)
-        .showPredictionPoints(false)
-        .showFaceOverlay(true)
-        .showFaceFeedbackBox(true);
+        .showVideoPreview(
+          true
+        )
+        .showPredictionPoints(
+          false
+        )
+        .showFaceOverlay(
+          true
+        )
+        .showFaceFeedbackBox(
+          true
+        );
 
       /*
        * ======================================================
@@ -466,19 +887,11 @@ export function EyeTrackingProvider({
        * ======================================================
        * 6. MONTA O OVERLAY
        * ======================================================
-       *
-       * A regra CSS continua ativa.
-       *
-       * Portanto a câmera ainda está invisível.
-       *
-       * CalibrationOverlay irá:
-       *
-       * - centralizar;
-       * - remover a proteção;
-       * - mostrar a câmera.
        */
 
-      if (mountedRef.current) {
+      if (
+        mountedRef.current
+      ) {
         setState(
           EyeTrackingState.CALIBRATING
         );
@@ -501,7 +914,9 @@ export function EyeTrackingProvider({
         err
       );
 
-      if (!mountedRef.current) {
+      if (
+        !mountedRef.current
+      ) {
         return;
       }
 
@@ -538,7 +953,46 @@ export function EyeTrackingProvider({
 
     hideTrackingVisuals();
 
-    if (mountedRef.current) {
+    /*
+     * A partir deste ponto começamos
+     * a gerar o buffer de observações.
+     */
+
+    monitoringRef.current =
+      true;
+
+    /*
+     * Determina se a aplicação
+     * está realmente ativa.
+     */
+
+    browserActiveRef.current =
+      document.visibilityState ===
+        "visible" &&
+      document.hasFocus();
+
+    /*
+     * Reinicia a referência temporal.
+     */
+
+    lastPredictionAtRef.current =
+      Date.now();
+
+    /*
+     * O primeiro gaze válido determinará
+     * INSIDE ou OUTSIDE.
+     */
+
+    gazeStateRef.current =
+      "UNKNOWN";
+
+    setGazeState(
+      "UNKNOWN"
+    );
+
+    if (
+      mountedRef.current
+    ) {
       setState(
         EyeTrackingState.TRACKING
       );
@@ -580,6 +1034,23 @@ export function EyeTrackingProvider({
       );
 
       /*
+       * Para geração de novos eventos.
+       */
+
+      monitoringRef.current =
+        false;
+
+      gazeStateRef.current =
+        "UNKNOWN";
+
+      setGazeState(
+        "UNKNOWN"
+      );
+
+      lastPredictionAtRef.current =
+        null;
+
+      /*
        * Primeiro escondemos qualquer interface.
        */
 
@@ -602,10 +1073,14 @@ export function EyeTrackingProvider({
       initializingRef.current =
         false;
 
-      if (mountedRef.current) {
+      if (
+        mountedRef.current
+      ) {
         resetGaze();
 
-        setError(null);
+        setError(
+          null
+        );
 
         setState(
           EyeTrackingState.OFF
@@ -627,7 +1102,9 @@ export function EyeTrackingProvider({
         err
       );
 
-      if (!mountedRef.current) {
+      if (
+        !mountedRef.current
+      ) {
         return;
       }
 
@@ -655,7 +1132,9 @@ export function EyeTrackingProvider({
      * uma operação em andamento.
      */
 
-    if (initializingRef.current) {
+    if (
+      initializingRef.current
+    ) {
       return;
     }
 
@@ -664,7 +1143,9 @@ export function EyeTrackingProvider({
      * desativar.
      */
 
-    if (startedRef.current) {
+    if (
+      startedRef.current
+    ) {
       await disable();
 
       return;
@@ -680,39 +1161,306 @@ export function EyeTrackingProvider({
 
   /*
    * ==========================================================
-   * CLEANUP
+   * EVENTOS DO NAVEGADOR
+   * ==========================================================
+   *
+   * PAGE_HIDDEN / PAGE_VISIBLE
+   *
+   * WINDOW_BLUR / WINDOW_FOCUS
+   *
+   * Esses eventos representam fatos observáveis.
+   *
+   * Não tentamos inferir qual aba ou qual
+   * aplicação recebeu o foco.
    * ==========================================================
    */
 
-  useEffect(() => {
-    mountedRef.current =
-      true;
-
-    return () => {
-      mountedRef.current =
-        false;
-
-      removeStartupHideStyle();
-
+  useEffect(
+    () => {
       /*
-       * Não usamos await dentro do cleanup.
+       * ------------------------------------------------------
+       * VISIBILITY CHANGE
+       * ------------------------------------------------------
        */
 
-      if (startedRef.current) {
-        try {
-          webgazer.end();
-        } catch (err) {
-          console.error(
-            "[EyeTracking] Erro no cleanup:",
-            err
+      function handleVisibilityChange() {
+        const visible =
+          document.visibilityState ===
+          "visible";
+
+        browserActiveRef.current =
+          visible &&
+          document.hasFocus();
+
+        if (
+          !monitoringRef.current
+        ) {
+          return;
+        }
+
+        appendEvent(
+          visible
+            ? "PAGE_VISIBLE"
+            : "PAGE_HIDDEN",
+
+          "browser"
+        );
+
+        /*
+         * Ao retornar para a página,
+         * reiniciamos a contagem para LOST.
+         *
+         * Isso evita interpretar o tempo
+         * fora da aba como ausência do gaze.
+         */
+
+        if (visible) {
+          lastPredictionAtRef.current =
+            Date.now();
+        }
+      }
+
+      /*
+       * ------------------------------------------------------
+       * WINDOW BLUR
+       * ------------------------------------------------------
+       */
+
+      function handleWindowBlur() {
+        browserActiveRef.current =
+          false;
+
+        if (
+          monitoringRef.current
+        ) {
+          appendEvent(
+            "WINDOW_BLUR",
+            "browser"
           );
         }
       }
 
-      startedRef.current =
-        false;
-    };
-  }, []);
+      /*
+       * ------------------------------------------------------
+       * WINDOW FOCUS
+       * ------------------------------------------------------
+       */
+
+      function handleWindowFocus() {
+        browserActiveRef.current =
+          document.visibilityState ===
+          "visible";
+
+        /*
+         * Dá uma nova janela temporal
+         * para o WebGazer voltar a
+         * produzir predições.
+         */
+
+        lastPredictionAtRef.current =
+          Date.now();
+
+        if (
+          monitoringRef.current
+        ) {
+          appendEvent(
+            "WINDOW_FOCUS",
+            "browser"
+          );
+        }
+      }
+
+      /*
+       * ------------------------------------------------------
+       * REGISTRA LISTENERS
+       * ------------------------------------------------------
+       */
+
+      document.addEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      window.addEventListener(
+        "blur",
+        handleWindowBlur
+      );
+
+      window.addEventListener(
+        "focus",
+        handleWindowFocus
+      );
+
+      /*
+       * ------------------------------------------------------
+       * CLEANUP
+       * ------------------------------------------------------
+       */
+
+      return () => {
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange
+        );
+
+        window.removeEventListener(
+          "blur",
+          handleWindowBlur
+        );
+
+        window.removeEventListener(
+          "focus",
+          handleWindowFocus
+        );
+      };
+    },
+    []
+  );
+
+  /*
+   * ==========================================================
+   * DETECÇÃO TEMPORAL DE GAZE LOST
+   * ==========================================================
+   *
+   * Uma ausência isolada de predição não é
+   * suficiente para declarar LOST.
+   *
+   * Atualmente usamos:
+   *
+   * 1500 ms sem predição válida.
+   *
+   * E somente quando:
+   *
+   * - monitoramento está ativo;
+   * - página está visível;
+   * - janela está em foco.
+   * ==========================================================
+   */
+
+  useEffect(
+    () => {
+      const interval =
+        window.setInterval(
+          () => {
+            /*
+             * EyeTracking ainda
+             * não está monitorando.
+             */
+
+            if (
+              !monitoringRef.current
+            ) {
+              return;
+            }
+
+            /*
+             * Página/janela não está ativa.
+             *
+             * Nesse caso ausência de gaze
+             * não significa GAZE_LOST.
+             */
+
+            if (
+              !browserActiveRef.current
+            ) {
+              return;
+            }
+
+            const lastPrediction =
+              lastPredictionAtRef.current;
+
+            if (
+              !lastPrediction
+            ) {
+              return;
+            }
+
+            /*
+             * Passou do limite temporal.
+             */
+
+            if (
+              Date.now() -
+                lastPrediction >=
+              GAZE_LOST_AFTER_MS
+            ) {
+              updateGazeState(
+                "LOST"
+              );
+            }
+          },
+
+          /*
+           * Verificação quatro vezes
+           * por segundo.
+           */
+
+          250
+        );
+
+      return () => {
+        window.clearInterval(
+          interval
+        );
+      };
+    },
+    []
+  );
+
+  /*
+   * ==========================================================
+   * LIMPAR BUFFER
+   * ==========================================================
+   */
+
+  function clearEvents() {
+    setEvents([]);
+  }
+
+  /*
+   * ==========================================================
+   * CLEANUP
+   * ==========================================================
+   */
+
+  useEffect(
+    () => {
+      mountedRef.current =
+        true;
+
+      return () => {
+        mountedRef.current =
+          false;
+
+        monitoringRef.current =
+          false;
+
+        removeStartupHideStyle();
+
+        /*
+         * Não usamos await dentro
+         * do cleanup.
+         */
+
+        if (
+          startedRef.current
+        ) {
+          try {
+            webgazer.end();
+          } catch (err) {
+            console.error(
+              "[EyeTracking] Erro no cleanup:",
+              err
+            );
+          }
+        }
+
+        startedRef.current =
+          false;
+      };
+    },
+    []
+  );
 
   /*
    * ==========================================================
@@ -721,14 +1469,55 @@ export function EyeTrackingProvider({
    */
 
   const value = {
+    /*
+     * Estado do EyeTracking
+     */
+
     state,
 
     enabled:
       startedRef.current,
 
+    /*
+     * Última coordenada
+     */
+
     gaze,
 
+    /*
+     * Estado comportamental
+     * observável do gaze
+     */
+
+    gazeState,
+
+    /*
+     * Buffer
+     */
+
+    events,
+
+    clearEvents,
+
+    /*
+     * Identificação da sessão
+     */
+
+    session: {
+      sessionId,
+      userId,
+      applicationName,
+    },
+
+    /*
+     * Erros
+     */
+
     error,
+
+    /*
+     * Operações
+     */
 
     enable,
 
@@ -749,21 +1538,32 @@ export function EyeTrackingProvider({
     >
       {children}
 
-      {state ===
-        EyeTrackingState.CALIBRATING && (
-        <CalibrationOverlay
-          webgazer={webgazer}
-          onComplete={
-            completeCalibration
-          }
-          onCancel={
-            cancelCalibration
-          }
-          onCameraReady={
-            removeStartupHideStyle
-          }
-        />
-      )}
+      {
+        state ===
+          EyeTrackingState.CALIBRATING &&
+        (
+          <CalibrationOverlay
+
+            webgazer={
+              webgazer
+            }
+
+            onComplete={
+              completeCalibration
+            }
+
+            onCancel={
+              cancelCalibration
+            }
+
+            onCameraReady={
+              removeStartupHideStyle
+            }
+
+          />
+        )
+      }
+
     </EyeTrackingContext.Provider>
   );
 }
