@@ -1,93 +1,143 @@
-#root {
-  width: 100%;
+/*
+ * ============================================================
+ * EyeTrackingContext
+ * Calibração
+ * ============================================================
+ */
+
+ .calibration-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  width: 100vw;
+  height: 100vh;
+
+  z-index: 9998;
+
+  background:
+    rgba(255, 255, 255, 0.94);
 }
 
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f5f7fa;
-  color: #222;
-}
+/*
+ * ------------------------------------------------------------
+ * Instruções
+ * ------------------------------------------------------------
+ */
 
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 30px;
-}
+.calibration-instructions {
+  position: fixed;
 
-.start-button {
-  padding: 12px 20px;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  background: #2563eb;
-  color: white;
-}
+  top: 20px;
+  left: 50%;
 
-.panel {
-  margin-top: 20px;
-  padding: 20px;
+  transform:
+    translateX(-50%);
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 6px;
+
+  min-width: 300px;
+
+  padding:
+    14px 24px;
 
   background: white;
 
-  border: 1px solid #ddd;
-  border-radius: 10px;
-}
-
-.coordinates {
-  display: flex;
-  gap: 20px;
-}
-
-.coordinates div {
-  min-width: 120px;
-
-  padding: 15px;
-
-  background: #f1f5f9;
+  border:
+    1px solid #ccc;
 
   border-radius: 8px;
 
-  display: flex;
-  flex-direction: column;
+  box-shadow:
+    0 4px 12px
+    rgba(0, 0, 0, 0.15);
+
+  text-align: center;
+
+  font-family:
+    Arial,
+    sans-serif;
+
+  z-index: 9999;
 }
 
-.coordinates span {
-  font-size: 13px;
-  color: #666;
+/*
+ * ------------------------------------------------------------
+ * Ponto de calibração
+ * ------------------------------------------------------------
+ */
+
+.calibration-point {
+  position: fixed;
+
+  width: 26px;
+  height: 26px;
+
+  padding: 0;
+
+  transform:
+    translate(-50%, -50%);
+
+  border-radius: 50%;
+
+  border:
+    4px solid white;
+
+  background: #ff3333;
+
+  box-shadow:
+    0 0 0 2px #222,
+    0 2px 8px
+    rgba(0, 0, 0, 0.25);
+
+  cursor: pointer;
+
+  z-index: 10000;
+
+  transition:
+    transform 0.1s ease;
 }
 
-.coordinates strong {
-  margin-top: 5px;
-  font-size: 24px;
+.calibration-point:hover {
+  transform:
+    translate(-50%, -50%)
+    scale(1.15);
 }
 
-.content {
-  margin-top: 30px;
+.calibration-point:active {
+  transform:
+    translate(-50%, -50%)
+    scale(0.9);
 }
 
-.test-area {
-  margin-top: 20px;
+/*
+ * ------------------------------------------------------------
+ * Cancelamento
+ * ------------------------------------------------------------
+ */
 
-  display: grid;
+.calibration-cancel {
+  margin-top: 6px;
 
-  grid-template-columns: 1fr 1fr;
+  padding:
+    6px 12px;
 
-  gap: 20px;
-}
-
-.test-area div {
-  height: 150px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: pointer;
 
   background: white;
 
-  border: 2px solid #ddd;
-  border-radius: 10px;
+  border:
+    1px solid #999;
 
-  font-weight: bold;
+  border-radius: 4px;
+}
+
+.calibration-cancel:hover {
+  background: #f3f3f3;
 }
