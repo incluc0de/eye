@@ -1,128 +1,165 @@
-import { useRef, useState } from "react";
-import { testarTfjs } from "./testTfjs";
+import { useEffect, useRef, useState } from "react";
+import webgazer from "webgazer";
 import "./App.css";
 
 function App() {
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-
-  const [status, setStatus] = useState("Aguardando teste...");
-  const [facesDetectadas, setFacesDetectadas] = useState(0);
-  const [backend, setBackend] = useState("-");
+  const [status, setStatus] = useState("Aguardando início...");
+  const [x, setX] = useState("-");
+  const [y, setY] = useState("-");
+  const [predictions, setPredictions] = useState(0);
   const [erro, setErro] = useState(null);
-  const [testando, setTestando] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
+  const [ativo, setAtivo] = useState(false);
 
-  async function testarDetector() {
+  const iniciadoRef = useRef(false);
+
+  async function iniciarWebGazer() {
+    if (iniciadoRef.current || iniciando) {
+      return;
+    }
+
     try {
-      setTestando(true);
+      setIniciando(true);
       setErro(null);
-      setFacesDetectadas(0);
+      setStatus("Inicializando WebGazer...");
+
+      console.log("WebGazer:", webgazer);
+      console.log(
+        "begin:",
+        typeof webgazer.begin
+      );
+      console.log(
+        "setGazeListener:",
+        typeof webgazer.setGazeListener
+      );
 
       // --------------------------------------------------
-      // 1. Solicitar acesso à webcam
+      // Listener das coordenadas do olhar
       // --------------------------------------------------
 
-      setStatus("Solicitando acesso à câmera...");
+      webgazer.setGazeListener(
+        (data, elapsedTime) => {
+          if (!data) {
+            return;
+          }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-        audio: false,
-      });
+          const gazeX = Math.round(data.x);
+          const gazeY = Math.round(data.y);
 
-      streamRef.current = stream;
+          setX(gazeX);
+          setY(gazeY);
 
-      // --------------------------------------------------
-      // 2. Associar webcam ao elemento <video>
-      // --------------------------------------------------
-
-      const video = videoRef.current;
-
-      if (!video) {
-        throw new Error("Elemento de vídeo não encontrado.");
-      }
-
-      video.srcObject = stream;
-
-      await video.play();
-
-      setStatus("Câmera ativa. Inicializando TensorFlow.js...");
-
-      // --------------------------------------------------
-      // 3. Executar teste TensorFlow.js
-      // --------------------------------------------------
-
-      const faces = await testarTfjs(video);
-
-      // --------------------------------------------------
-      // 4. Resultado
-      // --------------------------------------------------
-
-      const quantidade = faces?.length ?? 0;
-
-      setFacesDetectadas(quantidade);
-      setBackend("WebGL");
-
-      if (quantidade > 0) {
-        setStatus(
-          `TensorFlow.js funcionando! ${quantidade} face(s) detectada(s).`
-        );
-
-        console.log("TESTE TFJS CONCLUÍDO COM SUCESSO");
-        console.log("Faces:", faces);
-
-        if (faces[0]?.keypoints) {
-          console.log(
-            "Quantidade de keypoints:",
-            faces[0].keypoints.length
+          setPredictions(
+            (valorAtual) => valorAtual + 1
           );
 
-          console.log(
-            "Primeiros keypoints:",
-            faces[0].keypoints.slice(0, 10)
+          setStatus("Rastreamento ativo");
+
+          console.log("GAZE", {
+            x: gazeX,
+            y: gazeY,
+            elapsedTime,
+          });
+        }
+      );
+
+      // --------------------------------------------------
+      // Configurações visuais do WebGazer
+      // --------------------------------------------------
+
+      webgazer
+        .showVideoPreview(true)
+        .showPredictionPoints(true)
+        .showFaceOverlay(true)
+        .showFaceFeedbackBox(true);
+
+      console.log(
+        "Chamando webgazer.begin()..."
+      );
+
+      // --------------------------------------------------
+      // Inicialização
+      // --------------------------------------------------
+
+      await webgazer.begin();
+
+      console.log(
+        "webgazer.begin() concluído."
+      );
+
+      iniciadoRef.current = true;
+
+      setAtivo(true);
+
+      setStatus(
+        "WebGazer iniciado. Olhe para diferentes pontos da tela."
+      );
+    } catch (error) {
+      console.error(
+        "ERRO WEBGAZER:",
+        error
+      );
+
+      setErro(
+        error?.stack ||
+        error?.message ||
+        String(error)
+      );
+
+      setStatus(
+        "Erro ao inicializar WebGazer."
+      );
+    } finally {
+      setIniciando(false);
+    }
+  }
+
+  async function pararWebGazer() {
+    try {
+      console.log(
+        "Encerrando WebGazer..."
+      );
+
+      await webgazer.end();
+
+      iniciadoRef.current = false;
+
+      setAtivo(false);
+      setStatus("WebGazer encerrado.");
+
+      setX("-");
+      setY("-");
+      setPredictions(0);
+
+      console.log(
+        "WebGazer encerrado."
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao encerrar WebGazer:",
+        error
+      );
+    }
+  }
+
+  // --------------------------------------------------
+  // Cleanup
+  // --------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      if (iniciadoRef.current) {
+        try {
+          webgazer.end();
+        } catch (error) {
+          console.error(
+            "Erro ao finalizar WebGazer:",
+            error
           );
         }
-      } else {
-        setStatus(
-          "TensorFlow.js executou corretamente, mas nenhuma face foi detectada."
-        );
-
-        console.log("Nenhuma face detectada.");
       }
-    } catch (error) {
-      console.error("ERRO TESTE TFJS:", error);
-
-      setErro(error?.stack || error?.message || String(error));
-
-      setStatus("Erro durante o teste TensorFlow.js.");
-    } finally {
-      setTestando(false);
-    }
-  }
-
-  // --------------------------------------------------
-  // Encerrar câmera
-  // --------------------------------------------------
-
-  function pararCamera() {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setStatus("Câmera encerrada.");
-    setFacesDetectadas(0);
-  }
+    };
+  }, []);
 
   return (
     <main
@@ -135,95 +172,197 @@ function App() {
     >
       <h1>EyeTrackingContext</h1>
 
-      <h2>Teste TensorFlow.js / Face Landmarks</h2>
+      <h2>Teste WebGazer + TensorFlow.js</h2>
 
       <p>
-        Este teste verifica se o detector facial funciona utilizando
-        TensorFlow.js com backend WebGL, sem utilizar o runtime MediaPipe/WASM.
+        Teste do WebGazer utilizando o detector
+        FaceMesh com runtime TensorFlow.js/WebGL.
       </p>
 
-      {/* Webcam */}
-
-      <div
-        style={{
-          marginTop: "24px",
-          marginBottom: "24px",
-        }}
-      >
-        <video
-          ref={videoRef}
-          width="640"
-          height="480"
-          autoPlay
-          muted
-          playsInline
-          style={{
-            width: "100%",
-            maxWidth: "640px",
-            background: "#111",
-            borderRadius: "8px",
-          }}
-        />
-      </div>
-
-      {/* Botões */}
+      {/* ----------------------------------------------
+          CONTROLES
+      ---------------------------------------------- */}
 
       <div
         style={{
           display: "flex",
           gap: "12px",
           flexWrap: "wrap",
+          marginTop: "24px",
           marginBottom: "24px",
         }}
       >
         <button
-          onClick={testarDetector}
-          disabled={testando}
+          onClick={iniciarWebGazer}
+          disabled={iniciando || ativo}
           style={{
             padding: "10px 18px",
-            cursor: testando ? "not-allowed" : "pointer",
+            cursor:
+              iniciando || ativo
+                ? "not-allowed"
+                : "pointer",
           }}
         >
-          {testando
-            ? "Testando..."
-            : "Testar FaceMesh TFJS"}
+          {iniciando
+            ? "Inicializando..."
+            : "Iniciar Eye Tracking"}
         </button>
 
         <button
-          onClick={pararCamera}
+          onClick={pararWebGazer}
+          disabled={!ativo}
           style={{
             padding: "10px 18px",
-            cursor: "pointer",
+            cursor: ativo
+              ? "pointer"
+              : "not-allowed",
           }}
         >
-          Parar câmera
+          Parar Eye Tracking
         </button>
       </div>
 
-      {/* Informações */}
+      {/* ----------------------------------------------
+          STATUS
+      ---------------------------------------------- */}
 
       <div
         style={{
           padding: "20px",
           border: "1px solid #ccc",
           borderRadius: "8px",
+          marginBottom: "24px",
         }}
       >
         <p>
-          <strong>Status:</strong> {status}
+          <strong>Status:</strong>{" "}
+          {status}
         </p>
 
         <p>
-          <strong>Backend:</strong> {backend}
+          <strong>WebGazer:</strong>{" "}
+          {ativo ? "Ativo" : "Inativo"}
         </p>
 
         <p>
-          <strong>Faces detectadas:</strong>{" "}
-          {facesDetectadas}
+          <strong>Predições:</strong>{" "}
+          {predictions}
         </p>
       </div>
 
-      {/* Erro */}
+      {/* ----------------------------------------------
+          COORDENADAS
+      ---------------------------------------------- */}
+
+      <div
+        style={{
+          display: "flex",
+          gap: "20px",
+          marginBottom: "24px",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            padding: "24px",
+            border: "1px solid #ccc",
+            borderRadius: "8px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "14px",
+              marginBottom: "8px",
+            }}
+          >
+            GAZE X
+          </div>
+
+          <strong
+            style={{
+              fontSize: "36px",
+            }}
+          >
+            {x}
+          </strong>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            padding: "24px",
+            border: "1px solid #ccc",
+            borderRadius: "8px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "14px",
+              marginBottom: "8px",
+            }}
+          >
+            GAZE Y
+          </div>
+
+          <strong
+            style={{
+              fontSize: "36px",
+            }}
+          >
+            {y}
+          </strong>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------
+          ÁREA DE TESTE
+      ---------------------------------------------- */}
+
+      <div
+        style={{
+          minHeight: "300px",
+          padding: "30px",
+          border: "2px dashed #aaa",
+          borderRadius: "8px",
+        }}
+      >
+        <h3>Área para teste do olhar</h3>
+
+        <p>
+          Após iniciar o Eye Tracking, mova o
+          olhar entre diferentes regiões desta
+          página.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: "80px",
+          }}
+        >
+          <strong>← ESQUERDA</strong>
+
+          <strong>CENTRO</strong>
+
+          <strong>DIREITA →</strong>
+        </div>
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "120px",
+          }}
+        >
+          <strong>↓ PARTE INFERIOR ↓</strong>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------
+          ERRO
+      ---------------------------------------------- */}
 
       {erro && (
         <div
