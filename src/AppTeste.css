@@ -1,0 +1,143 @@
+/*
+ * ============================================================
+ * EyeTrackingContext
+ * Calibração
+ * ============================================================
+ */
+
+ .calibration-overlay {
+    position: fixed;
+  
+    inset: 0;
+  
+    width: 100vw;
+    height: 100vh;
+  
+    z-index: 9998;
+  
+    background:
+      rgba(255, 255, 255, 0.94);
+  }
+  
+  /*
+   * ------------------------------------------------------------
+   * Instruções
+   * ------------------------------------------------------------
+   */
+  
+  .calibration-instructions {
+    position: fixed;
+  
+    top: 20px;
+    left: 50%;
+  
+    transform:
+      translateX(-50%);
+  
+    display: flex;
+  
+    flex-direction: column;
+  
+    align-items: center;
+  
+    gap: 6px;
+  
+    min-width: 300px;
+  
+    padding:
+      14px 24px;
+  
+    background: white;
+  
+    border:
+      1px solid #ccc;
+  
+    border-radius: 8px;
+  
+    box-shadow:
+      0 4px 12px
+      rgba(0, 0, 0, 0.15);
+  
+    text-align: center;
+  
+    font-family:
+      Arial,
+      sans-serif;
+  
+    z-index: 9999;
+  }
+  
+  /*
+   * ------------------------------------------------------------
+   * Ponto de calibração
+   * ------------------------------------------------------------
+   */
+  
+  .calibration-point {
+    position: fixed;
+  
+    width: 26px;
+    height: 26px;
+  
+    padding: 0;
+  
+    transform:
+      translate(-50%, -50%);
+  
+    border-radius: 50%;
+  
+    border:
+      4px solid white;
+  
+    background: #ff3333;
+  
+    box-shadow:
+      0 0 0 2px #222,
+      0 2px 8px
+      rgba(0, 0, 0, 0.25);
+  
+    cursor: pointer;
+  
+    z-index: 10000;
+  
+    transition:
+      transform 0.1s ease;
+  }
+  
+  .calibration-point:hover {
+    transform:
+      translate(-50%, -50%)
+      scale(1.15);
+  }
+  
+  .calibration-point:active {
+    transform:
+      translate(-50%, -50%)
+      scale(0.9);
+  }
+  
+  /*
+   * ------------------------------------------------------------
+   * Cancelamento
+   * ------------------------------------------------------------
+   */
+  
+  .calibration-cancel {
+    margin-top: 6px;
+  
+    padding:
+      6px 12px;
+  
+    cursor: pointer;
+  
+    background: white;
+  
+    border:
+      1px solid #999;
+  
+    border-radius: 4px;
+  }
+  
+  .calibration-cancel:hover {
+    background: #f3f3f3;
+  }
