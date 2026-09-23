@@ -11,152 +11,196 @@ function EyeTrackingControl() {
     toggle,
   } = useEyeTracking();
 
-  const isOff =
-    state ===
-    EyeTrackingState.OFF;
-
-  const isInitializing =
-    state ===
-    EyeTrackingState.INITIALIZING;
-
-  const isCalibrating =
-    state ===
-    EyeTrackingState.CALIBRATING;
-
-  const isTracking =
-    state ===
-    EyeTrackingState.TRACKING;
-
-  const isError =
-    state ===
-    EyeTrackingState.ERROR;
-
   /*
    * Durante a calibração o controle
-   * principal não aparece.
+   * principal não é exibido.
    *
-   * O overlay possui o botão Cancelar.
+   * O usuário utiliza o botão Cancelar
+   * disponível no próprio overlay.
    */
 
-  if (isCalibrating) {
+  if (
+    state ===
+    EyeTrackingState.CALIBRATING
+  ) {
     return null;
   }
 
-  let indicatorClass =
-    "eye-status-off";
+  /*
+   * ==========================================================
+   * ESTADO VISUAL
+   * ==========================================================
+   */
+
+  let statusClass =
+    "status-off";
 
   let label =
-    "Eye Tracking desativado";
+    "Ativar rastreamento ocular";
 
-  if (isInitializing) {
-    indicatorClass =
-      "eye-status-initializing";
+  let eyeOpen = false;
 
-    label =
-      "Inicializando Eye Tracking";
-  }
+  /*
+   * ----------------------------------------------------------
+   * INICIALIZANDO
+   * ----------------------------------------------------------
+   */
 
-  if (isTracking) {
-    indicatorClass =
-      "eye-status-active";
-
-    label =
-      "Eye Tracking ativo";
-  }
-
-  if (isError) {
-    indicatorClass =
-      "eye-status-error";
+  if (
+    state ===
+    EyeTrackingState.INITIALIZING
+  ) {
+    statusClass =
+      "status-initializing";
 
     label =
-      "Eye Tracking indisponível";
+      "Inicializando rastreamento ocular";
+
+    eyeOpen = true;
   }
 
-  async function handleClick() {
-    if (isInitializing) {
-      return;
-    }
+  /*
+   * ----------------------------------------------------------
+   * MONITORANDO
+   * ----------------------------------------------------------
+   */
 
-    await toggle();
+  if (
+    state ===
+    EyeTrackingState.TRACKING
+  ) {
+    statusClass =
+      "status-tracking";
+
+    label =
+      "Desativar rastreamento ocular";
+
+    eyeOpen = true;
   }
+
+  /*
+   * ----------------------------------------------------------
+   * PERDA DO RASTREAMENTO
+   * ----------------------------------------------------------
+   */
+
+  if (
+    state ===
+    EyeTrackingState.LOST
+  ) {
+    statusClass =
+      "status-lost";
+
+    label =
+      "Rastreamento ocular temporariamente indisponível";
+
+    eyeOpen = true;
+  }
+
+  /*
+   * ----------------------------------------------------------
+   * ERRO
+   * ----------------------------------------------------------
+   */
+
+  if (
+    state ===
+    EyeTrackingState.ERROR
+  ) {
+    statusClass =
+      "status-error";
+
+    label =
+      "Erro no rastreamento ocular";
+
+    eyeOpen = false;
+  }
+
+  /*
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
 
   return (
     <button
       type="button"
-      className="eye-tracking-control"
-      onClick={handleClick}
-      disabled={isInitializing}
 
-      title={
-        isOff
-          ? "Ativar Eye Tracking"
-          : isError
-            ? "Tentar novamente"
-            : "Desativar Eye Tracking"
+      className={`
+        eye-tracking-control
+        ${statusClass}
+      `}
+
+      onClick={toggle}
+
+      disabled={
+        state ===
+        EyeTrackingState.INITIALIZING
       }
 
       aria-label={label}
-    >
 
-      <span
-        className={
-          isOff
-            ? "eye-icon eye-icon-off"
-            : "eye-icon"
-        }
+      title={label}
+    >
+      {/*
+       * ======================================================
+       * ÍCONE DO OLHO
+       * ======================================================
+       */}
+
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
       >
+        {/*
+         * Forma principal do olho
+         */}
 
-        <svg
-          viewBox="0 0 24 24"
-          width="28"
-          height="28"
-          fill="none"
+        <path
+          d="
+            M2 12
+            C4.8 7.5 8.1 5.5 12 5.5
+            C15.9 5.5 19.2 7.5 22 12
+            C19.2 16.5 15.9 18.5 12 18.5
+            C8.1 18.5 4.8 16.5 2 12
+            Z
+          "
           stroke="currentColor"
           strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
-        >
+        />
 
-          <path
-            d="
-              M2 12
-              S5.5 6
-              12 6
-              22 12
-              22 12
-              18.5 18
-              12 18
-              2 12
-              2 12
-            "
+        {/*
+         * Pupila
+         */}
+
+        {eyeOpen && (
+          <circle
+            cx="12"
+            cy="12"
+            r="3"
+            stroke="currentColor"
+            strokeWidth="1.8"
           />
+        )}
 
-          {!isOff && (
-            <circle
-              cx="12"
-              cy="12"
-              r="3"
-            />
-          )}
+        {/*
+         * Quando desligado ou em erro,
+         * mostramos o risco sobre o olho.
+         */}
 
-          {isOff && (
-            <path
-              d="M4 4 L20 20"
-            />
-          )}
-
-        </svg>
-
-      </span>
-
-      <span
-        className={
-          `eye-status-dot ${indicatorClass}`
-        }
-        aria-hidden="true"
-      />
-
+        {!eyeOpen && (
+          <path
+            d="M4 4L20 20"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        )}
+      </svg>
     </button>
   );
 }

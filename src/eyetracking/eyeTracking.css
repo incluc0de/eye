@@ -11,12 +11,20 @@
     width: 54px;
     height: 54px;
   
+    padding: 0;
+  
     border-radius: 50%;
   
-    border: 1px solid
-      rgba(0, 0, 0, 0.14);
+    /*
+     * A própria borda passa a representar
+     * o estado do Eye Tracking.
+     */
+  
+    border: 3px solid #9e9e9e;
   
     background: #ffffff;
+  
+    color: #242424;
   
     display: flex;
     align-items: center;
@@ -26,13 +34,16 @@
   
     z-index: 9000;
   
+    box-sizing: border-box;
+  
     box-shadow:
       0 3px 12px
       rgba(0, 0, 0, 0.14);
   
     transition:
       transform 0.15s ease,
-      box-shadow 0.15s ease;
+      box-shadow 0.15s ease,
+      border-color 0.2s ease;
   }
   
   .eye-tracking-control:hover {
@@ -44,7 +55,8 @@
   }
   
   .eye-tracking-control:focus-visible {
-    outline: 3px solid
+    outline:
+      3px solid
       rgba(25, 118, 210, 0.35);
   
     outline-offset: 3px;
@@ -52,69 +64,74 @@
   
   .eye-tracking-control:disabled {
     cursor: wait;
-    opacity: 0.7;
+  
+    opacity: 0.8;
   }
   
   .eye-tracking-control svg {
     width: 26px;
     height: 26px;
+  
+    display: block;
   }
   
   /* ============================================================
-     INDICADOR DE STATUS
+     STATUS DO EYE TRACKING
+     ============================================================
+     
+     Não utilizamos mais uma bolinha.
+     
+     A borda inteira do botão representa
+     o estado atual.
      ============================================================ */
   
-  /* ============================================================
-   INDICADOR DE STATUS
-   ============================================================ */
-
-.eye-tracking-status-dot {
-  position: absolute;
-
-  right: 2px;
-  bottom: 2px;
-
-  width: 12px;
-  height: 12px;
-
-  border-radius: 50%;
-
-  border: 2px solid #ffffff;
-
-  box-sizing: border-box;
-
-  z-index: 2;
-}
-
-/* desligado */
-.eye-tracking-status-dot.off,
-.eye-tracking-status-off {
-  background-color: #9e9e9e;
-}
-
-/* inicializando */
-.eye-tracking-status-dot.initializing,
-.eye-tracking-status-initializing {
-  background-color: #1976d2;
-}
-
-/* monitorando */
-.eye-tracking-status-dot.tracking,
-.eye-tracking-status-tracking {
-  background-color: #2e7d32;
-}
-
-/* erro */
-.eye-tracking-status-dot.error,
-.eye-tracking-status-error {
-  background-color: #c62828;
-}
-
-/* perda do rastreamento */
-.eye-tracking-status-dot.lost,
-.eye-tracking-status-lost {
-  background-color: #c62828;
-}
+  /*
+   * OFF
+   *
+   * Eye Tracking desligado.
+   */
+  
+  .eye-tracking-control.status-off {
+    border-color: #9e9e9e;
+  }
+  
+  /*
+   * INITIALIZING
+   *
+   * WebGazer/câmera sendo inicializados.
+   */
+  
+  .eye-tracking-control.status-initializing {
+    border-color: #1976d2;
+  }
+  
+  /*
+   * TRACKING
+   *
+   * Rastreamento ativo.
+   */
+  
+  .eye-tracking-control.status-tracking {
+    border-color: #2e7d32;
+  }
+  
+  /*
+   * LOST
+   *
+   * Rastreamento temporariamente perdido.
+   */
+  
+  .eye-tracking-control.status-lost {
+    border-color: #c62828;
+  }
+  
+  /*
+   * ERROR
+   */
+  
+  .eye-tracking-control.status-error {
+    border-color: #c62828;
+  }
   
   /* ============================================================
      OVERLAY DE CALIBRAÇÃO
@@ -127,11 +144,6 @@
   
     width: 100%;
   
-    /*
-     * 100dvh acompanha melhor a área realmente
-     * disponível em navegadores móveis.
-     */
-  
     height: 100vh;
     height: 100dvh;
   
@@ -142,28 +154,29 @@
   
     z-index: 10000;
   
-    /*
-     * Áreas seguras de dispositivos móveis.
-     */
-  
     padding:
-      env(safe-area-inset-top, 0px)
-      env(safe-area-inset-right, 0px)
-      env(safe-area-inset-bottom, 0px)
-      env(safe-area-inset-left, 0px);
+      env(
+        safe-area-inset-top,
+        0px
+      )
+      env(
+        safe-area-inset-right,
+        0px
+      )
+      env(
+        safe-area-inset-bottom,
+        0px
+      )
+      env(
+        safe-area-inset-left,
+        0px
+      );
   
     box-sizing: border-box;
   }
   
   /* ============================================================
-     CONTAINER DA CÂMERA
-     ============================================================
-     
-     Esta classe é adicionada pelo CalibrationOverlay.
-     
-     Desktop:
-     câmera aproximadamente na mesma posição
-     utilizada anteriormente.
+     CÂMERA DURANTE A CALIBRAÇÃO
      ============================================================ */
   
   .incluc0de-calibration-camera {
@@ -173,11 +186,15 @@
     top: 37% !important;
   
     transform:
-      translate(-50%, -50%) !important;
+      translate(
+        -50%,
+        -50%
+      ) !important;
   
     z-index: 10020 !important;
   
     display: block !important;
+  
     opacity: 1 !important;
   }
   
@@ -197,22 +214,35 @@
     padding: 0;
   
     transform:
-      translate(-50%, -50%);
+      translate(
+        -50%,
+        -50%
+      );
   
     border-radius: 50%;
   
-    border: 3px solid #9fa4a7;
+    border:
+      3px solid
+      #9fa4a7;
   
     background: #ffffff;
   
     color: #424242;
   
     font-size: 15px;
+  
     font-weight: 700;
   
     display: flex;
+  
     align-items: center;
+  
     justify-content: center;
+  
+    /*
+     * Pontos comuns ficam abaixo
+     * do painel de instruções.
+     */
   
     z-index: 10030;
   
@@ -238,6 +268,19 @@
   
   /* ============================================================
      PONTO ATIVO
+     ============================================================
+     
+     IMPORTANTE:
+     
+     O ponto ativo fica ACIMA do painel.
+     
+     Portanto, mesmo que espacialmente ele
+     coincida com a mensagem no celular,
+     continuará:
+     
+     - visível;
+     - destacado;
+     - clicável.
      ============================================================ */
   
   .calibration-point-active {
@@ -247,19 +290,27 @@
     min-width: 46px;
     min-height: 46px;
   
-    border: 4px solid #2e7d32;
+    border:
+      4px solid
+      #2e7d32;
   
     background: #e8f5e9;
   
     color: #1b5e20;
   
     cursor: pointer;
-    
+  
+    /*
+     * Painel = 10040
+     * Ponto ativo = 10060
+     */
+  
     z-index: 10060;
   
     animation:
       calibrationPointPulse
-      1.5s ease-in-out
+      1.5s
+      ease-in-out
       infinite;
   }
   
@@ -280,7 +331,7 @@
   }
   
   /* ============================================================
-     PAINEL CENTRAL
+     PAINEL DE INSTRUÇÕES
      ============================================================ */
   
   .calibration-instructions {
@@ -293,13 +344,22 @@
       translateX(-50%);
   
     width:
-      min(520px, 70vw);
+      min(
+        520px,
+        70vw
+      );
   
-    padding: 18px 24px;
+    padding:
+      18px 24px;
   
     border:
       1px solid
-      rgba(0, 0, 0, 0.14);
+      rgba(
+        0,
+        0,
+        0,
+        0.14
+      );
   
     border-radius: 14px;
   
@@ -309,13 +369,22 @@
   
     text-align: center;
   
+    /*
+     * Abaixo do ponto ativo.
+     */
+  
     z-index: 10040;
   
     box-sizing: border-box;
   
     box-shadow:
       0 5px 20px
-      rgba(0, 0, 0, 0.12);
+      rgba(
+        0,
+        0,
+        0,
+        0.12
+      );
   }
   
   .calibration-instructions h2 {
@@ -323,6 +392,7 @@
       0 0 10px;
   
     font-size: 20px;
+  
     line-height: 1.3;
   
     font-weight: 600;
@@ -333,17 +403,19 @@
       8px 0;
   
     font-size: 15px;
+  
     line-height: 1.45;
   }
   
   /* ============================================================
-     AÇÕES
+     BOTÕES DO PAINEL
      ============================================================ */
   
   .calibration-actions {
     display: flex;
   
     align-items: center;
+  
     justify-content: center;
   
     flex-wrap: wrap;
@@ -367,12 +439,16 @@
     cursor: pointer;
   
     transition:
-      background-color 0.15s ease,
-      border-color 0.15s ease;
+      background-color
+        0.15s ease,
+      border-color
+        0.15s ease;
   }
   
   .calibration-start-button {
-    border: 1px solid #242424;
+    border:
+      1px solid
+      #242424;
   
     background: #242424;
   
@@ -385,7 +461,8 @@
   
   .calibration-cancel-button {
     border:
-      1px solid #d3d7da;
+      1px solid
+      #d3d7da;
   
     background: #ffffff;
   
@@ -401,13 +478,18 @@
   .calibration-point:focus-visible {
     outline:
       3px solid
-      rgba(25, 118, 210, 0.35);
+      rgba(
+        25,
+        118,
+        210,
+        0.35
+      );
   
     outline-offset: 3px;
   }
   
   /* ============================================================
-     CONCLUSÃO
+     CALIBRAÇÃO CONCLUÍDA
      ============================================================ */
   
   .calibration-completed {
@@ -428,34 +510,43 @@
     color: #2e7d32;
   
     display: flex;
+  
     align-items: center;
+  
     justify-content: center;
   
     font-size: 24px;
+  
     font-weight: 700;
   }
   
   /* ============================================================
-     ANIMAÇÃO
+     ANIMAÇÃO DO PONTO ATIVO
      ============================================================ */
   
   @keyframes calibrationPointPulse {
     0%,
     100% {
       transform:
-        translate(-50%, -50%)
+        translate(
+          -50%,
+          -50%
+        )
         scale(1);
     }
   
     50% {
       transform:
-        translate(-50%, -50%)
+        translate(
+          -50%,
+          -50%
+        )
         scale(1.18);
     }
   }
   
   /* ============================================================
-     TABLETS / TELAS INTERMEDIÁRIAS
+     TABLET
      ============================================================ */
   
   @media (
@@ -463,26 +554,59 @@
   ) {
     .calibration-instructions {
       width:
-        min(500px, 76vw);
+        min(
+          500px,
+          76vw
+        );
     }
   }
   
   /* ============================================================
      MOBILE
-     ============================================================
-     
-     O objetivo aqui é:
-     
-     - câmera menor;
-     - câmera mais alta;
-     - painel mais compacto;
-     - botões sempre visíveis;
-     - pontos afastados das barras do navegador.
      ============================================================ */
   
   @media (
     max-width: 600px
   ) {
+    /*
+     * ----------------------------------------------------------
+     * BOTÃO EYE TRACKING
+     * ----------------------------------------------------------
+     */
+  
+    .eye-tracking-control {
+      right:
+        max(
+          16px,
+          env(
+            safe-area-inset-right,
+            0px
+          )
+        );
+  
+      bottom:
+        max(
+          16px,
+          env(
+            safe-area-inset-bottom,
+            0px
+          )
+        );
+  
+      /*
+       * Um pouco maior no celular,
+       * melhorando a área de toque.
+       */
+  
+      width: 56px;
+      height: 56px;
+    }
+  
+    .eye-tracking-control svg {
+      width: 27px;
+      height: 27px;
+    }
+  
     /*
      * ----------------------------------------------------------
      * CÂMERA
@@ -492,19 +616,13 @@
     .incluc0de-calibration-camera {
       left: 50% !important;
   
-      /*
-       * Sobe a câmera.
-       */
-  
       top: 27% !important;
   
-      /*
-       * Reduz o conjunto inteiro:
-       * vídeo + FaceMesh + feedback box.
-       */
-  
       transform:
-        translate(-50%, -50%)
+        translate(
+          -50%,
+          -50%
+        )
         scale(0.68) !important;
   
       transform-origin:
@@ -519,6 +637,7 @@
   
     .calibration-instructions {
       left: 16px;
+  
       right: 16px;
   
       top: 52%;
@@ -526,10 +645,6 @@
       transform: none;
   
       width: auto;
-  
-      /*
-       * Evita ultrapassar a área útil.
-       */
   
       max-height:
         calc(
@@ -546,11 +661,6 @@
         14px 16px;
   
       border-radius: 12px;
-  
-      /*
-       * Permite rolagem interna apenas
-       * em telas excepcionalmente pequenas.
-       */
   
       -webkit-overflow-scrolling:
         touch;
@@ -587,10 +697,6 @@
   
     .calibration-start-button,
     .calibration-cancel-button {
-      /*
-       * Área de toque adequada para mobile.
-       */
-  
       min-height: 44px;
   
       padding:
@@ -603,47 +709,32 @@
      * ----------------------------------------------------------
      * PONTOS
      * ----------------------------------------------------------
-     *
-     * Os pontos continuam utilizando as
-     * coordenadas percentuais definidas em
-     * calibrationPoints.js.
-     *
-     * Entretanto, limitamos sua posição
-     * para que não encostem fisicamente
-     * nas bordas do aparelho.
      */
   
     .calibration-point {
-      /*
-       * Área visual continua compacta.
-       */
-  
       width: 28px;
       height: 28px;
   
       min-width: 28px;
       min-height: 28px;
   
-      /*
-       * Apesar de o botão ser visualmente
-       * pequeno, adicionamos touch-action
-       * apropriado.
-       */
-  
-      touch-action: manipulation;
+      touch-action:
+        manipulation;
     }
   
-    .calibration-point-active {
-      /*
-       * O ponto ativo permanece
-       * suficientemente grande para toque.
-       */
+    /*
+     * O ponto ativo continua maior
+     * e acima do painel.
+     */
   
+    .calibration-point-active {
       width: 46px;
       height: 46px;
   
       min-width: 46px;
       min-height: 46px;
+  
+      z-index: 10060;
     }
   }
   
@@ -656,21 +747,16 @@
   ) and (
     max-height: 750px
   ) {
-    /*
-     * Câmera ainda menor e mais alta.
-     */
-  
     .incluc0de-calibration-camera {
       top: 24% !important;
   
       transform:
-        translate(-50%, -50%)
+        translate(
+          -50%,
+          -50%
+        )
         scale(0.58) !important;
     }
-  
-    /*
-     * Painel começa um pouco mais alto.
-     */
   
     .calibration-instructions {
       top: 46%;
@@ -715,10 +801,10 @@
   ) {
     .calibration-instructions {
       left: 12px;
+  
       right: 12px;
   
-      padding:
-        12px;
+      padding: 12px;
     }
   
     .calibration-instructions h2 {
@@ -728,11 +814,6 @@
     .calibration-instructions p {
       font-size: 13px;
     }
-  
-    /*
-     * Mantém os dois botões utilizáveis
-     * mesmo em telas estreitas.
-     */
   
     .calibration-actions {
       width: 100%;
